@@ -208,11 +208,11 @@
           <input type="date" id="psEndDate" onchange="renderProfitSummary()">
         </div>
         <div class="ps-value num" id="psLaba">Rp 0</div>
-        <div class="ps-desc" id="psDesc">Laba 20% dari pendapatan dikurangi pengeluaran</div>
+        <div class="ps-desc" id="psDesc">Sisa operasional = limit 20% - pengeluaran</div>
         <div class="ps-grid">
           <div class="ps-box"><span>Pendapatan</span><b id="psPendapatan" class="num">Rp 0</b></div>
-          <div class="ps-box"><span>Pengeluaran</span><b id="psPengeluaran" class="num" style="color:#ff8a80">Rp 0</b></div>
-          <div class="ps-box"><span>Laba Bersih 20%</span><b id="psLabaBersih" class="num" style="color:#69f0ae">Rp 0</b></div>
+          <div class="ps-box"><span>Terpakai</span><b id="psPengeluaran" class="num" style="color:#ff8a80">Rp 0</b></div>
+          <div class="ps-box"><span>Limit 20%</span><b id="psLabaBersih" class="num" style="color:#69f0ae">Rp 0</b></div>
         </div>
       </div>
 
@@ -220,7 +220,7 @@
         <div class="stat"><span>Laba 20% (Semua)</span><b id="autoProfit" class="blue num">Rp 0</b></div>
         <div class="stat" onclick="showExpenseListTodayModal()" style="cursor:pointer;border-color:#ffd7d0;background:#fff8f6"><span>Pengeluaran Hari Ini</span><b id="spendingLimit" class="red num">Rp 0</b><div style="font-size:9px;color:var(--red);font-weight:900;margin-top:3px">Tap untuk lihat detail</div></div>
       </div>
-      <div id="operationalCard" class="card safe-card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;gap:8px"><b>Sisa Operasional</b><b id="operationalUsed" class="num">Rp 0</b></div><div class="small">Limit 20%: <span id="operationalTotal">Rp 0</span> · Terpakai: <span id="operationalSpent">Rp 0</span></div><div id="limitWarning" class="small red" style="font-weight:900;margin-top:5px"></div></div>
+      <div id="operationalCard" class="card safe-card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;gap:8px"><b>Sisa Operasional</b><b id="operationalUsed" class="num">Rp 0</b></div><div class="small">Ikut filter Ringkasan Laba · Limit 20%: <span id="operationalTotal">Rp 0</span> · Terpakai: <span id="operationalSpent">Rp 0</span></div><div id="limitWarning" class="small red" style="font-weight:900;margin-top:5px"></div></div>
       <div class="card"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px"><div><div class="section-title" style="margin:0 0 3px">Zakat Mal</div><div id="zakatAmountLarge" class="num gold" style="font-size:23px">Rp 0</div><div id="zakatPaymentStatusText" class="small">Menunggu</div></div><button id="payZakatBtn" class="btn gold" style="width:auto;min-width:92px;padding:10px" onclick="markZakatPaid()">Bayar</button></div><div class="grid2" style="margin-top:10px"><div class="stat"><span>Laba 20% (Manual+Firebase)</span><b id="totalProfitDisplay" class="num">Rp 0</b></div><div class="stat"><span>Belum Dizakatkan</span><b id="unpaidProfitDisplay" class="num">Rp 0</b></div></div><div style="font-size:10px;color:var(--muted);font-weight:800;margin-top:7px;padding-top:7px;border-top:1px solid var(--line)">Zakat = 2.5% × laba bersih (20% dari total pendapatan manual + Firebase)</div><div style="display:none"><span id="totalZakatPaidProfit">Rp 0</span></div><div id="zakatHistoryPreview" class="zakat-mini" style="display:none"><div id="zakatHistoryMiniList" class="zakat-mini"></div><button class="tab" onclick="showZakatHistoryModal()">Semua</button></div></div>
     </section>
 
@@ -524,7 +524,7 @@ async function requestFullReset(){
     }catch(e){showToast('Gagal hapus full: '+e.message)}
   });
 }
-function formatRupiah(n){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n||0)}function getActualAmount(raw){if(!raw||isNaN(raw))return 0;return parseFloat(raw)*1000}function handleSmartAmount(input){$('liveAmountPreview').innerText=input.value?formatRupiah(getActualAmount(input.value)):''}function updatePlaceholder(){$('description').placeholder=$('type').value==='expense'?'Contoh: Makan, listrik':'Omset (boleh kosong)'}
+function formatRupiah(n){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0,maximumFractionDigits:0}).format(Math.round(Number(n||0)))}function getActualAmount(raw){if(!raw||isNaN(raw))return 0;return parseFloat(raw)*1000}function handleSmartAmount(input){$('liveAmountPreview').innerText=input.value?formatRupiah(getActualAmount(input.value)):''}function updatePlaceholder(){$('description').placeholder=$('type').value==='expense'?'Contoh: Makan, listrik':'Omset (boleh kosong)'}
 function getGrossIncomeForRange(mode,startDate,endDate){
   const today=getLocalDateString(), month=today.slice(0,7);
   if(mode==='today'){
@@ -969,11 +969,17 @@ function render(){
   $('totalExpense').innerText=formatRupiah(todayOut);   // hero: hari ini
   $('autoProfit').innerText=formatRupiah(profit);
   $('netBalance').innerText=formatRupiah(net);
-  const remainingOps=profit-totalOut;
+  // Card Sisa Operasional bawah disamakan dengan Ringkasan Laba.
+  // Sebelumnya card ini memakai semua data/kumulatif, sedangkan Ringkasan Laba memakai filter
+  // today/month/year/custom. Akibatnya angka sisa operasional bisa terlihat berbeda.
+  const opDataForCard=getProfitSummaryData(currentProfitFilter);
+  const opProfit=opDataForCard?Number(opDataForCard.laba||0):profit;
+  const opSpent=opDataForCard?Number(opDataForCard.totalExpense||0):totalOut;
+  const remainingOps=opProfit-opSpent;
   $('spendingLimit').innerText=formatRupiah(todayOut);  // stat card home: hari ini
   $('operationalUsed').innerText=formatRupiah(remainingOps);
-  $('operationalTotal').innerText=formatRupiah(profit);
-  const spentEl=$('operationalSpent');if(spentEl)spentEl.innerText=formatRupiah(totalOut);
+  $('operationalTotal').innerText=formatRupiah(opProfit);
+  const spentEl=$('operationalSpent');if(spentEl)spentEl.innerText=formatRupiah(opSpent);
   // Riwayat: pengeluaran sesuai filter aktif + semua
   if($('expenseAllSummary'))$('expenseAllSummary').innerText=formatRupiah(totalOut);
   // Stat card kiri ikut filter aktif
@@ -994,9 +1000,9 @@ function render(){
 
   renderZakatSection();
 
-  const over=totalOut>profit&&profit>0;
+  const over=opSpent>opProfit&&opProfit>0;
   $('operationalCard').className='card '+(over?'danger-card':'safe-card');
-  $('limitWarning').innerText=over?'Over budget: pengeluaran lebih dari 20% omset':'';
+  $('limitWarning').innerText=over?'Over budget: pengeluaran lebih dari 20% omset periode ini':'';
   $('statusText').innerText=over?'Bahaya':'Aman';
   $('statusBadge').style.background=over?'#fff0ee':'#e9f7ef';
   $('statusBadge').style.color=over?'#c0392b':'#176b43';
@@ -1233,7 +1239,8 @@ function renderCashFisik(){
 
 // =====================================================
 // RINGKASAN LABA BARU — filter harian/bulanan/tahunan/custom
-// Laba = 20% dari (pendapatan manual + Firebase) - total pengeluaran periode
+// Angka utama menampilkan Sisa Operasional = Limit 20% - Terpakai.
+// Limit 20% tetap dihitung dari pendapatan manual + Firebase sesuai periode.
 // =====================================================
 let currentProfitFilter='today';
 function setProfitFilter(f){
@@ -1262,7 +1269,7 @@ function getProfitSummaryData(filter){
   // Helper: expense bisnis = expense tapi BUKAN cashout (QRIS/Tabungan hanya kurangi cash fisik)
   const isRealExpense=t=>t.type==='expense'&&!isCashOut(t);
   if(filter==='today'){
-    incomeRows=allTx.filter(t=>t.type==='income'&&t.date===today&&!isFirebaseUploaded(t));
+    incomeRows=allTx.filter(t=>t.type==='income'&&t.date===today);
     expenseRows=allTx.filter(t=>isRealExpense(t)&&t.date===today);
   } else if(filter==='month'){
     incomeRows=allTx.filter(t=>t.type==='income'&&String(t.date||'').startsWith(thisMonth));
@@ -1283,8 +1290,9 @@ function getProfitSummaryData(filter){
   if(todayCovered&&fbToday>0&&!uploadedTodayTx)fbExtra=fbToday;
   const totalIncome=incomeRows.reduce((sum,t)=>sum+Number(t.amount||0),0)+fbExtra;
   const totalExpense=expenseRows.reduce((sum,t)=>sum+Number(t.amount||0),0);
-  const laba=(totalIncome*.2)-totalExpense;
-  return {totalIncome,totalExpense,laba,labaBersih:Math.max(0,laba)};
+  const laba=Math.round(totalIncome*.2);
+  const sisaOperasional=Math.round(laba-totalExpense);
+  return {totalIncome,totalExpense,laba,laba20:laba,sisaOperasional,labaBersih:Math.max(0,sisaOperasional)};
 }
 function renderProfitSummary(){
   const data=getProfitSummaryData(currentProfitFilter);
@@ -1294,13 +1302,16 @@ function renderProfitSummary(){
     if(descEl)descEl.innerText='Pilih rentang tanggal custom';
     return;
   }
-  const {totalIncome,totalExpense,laba}=data;
+  const {totalIncome,totalExpense,laba,sisaOperasional}=data;
   const filterLabel={today:'Hari Ini',month:'Bulan Ini',year:'Tahun Ini',custom:'Custom'}[currentProfitFilter]||'';
-  if(labaEl){labaEl.innerText=formatRupiah(Math.abs(laba));labaEl.style.color=laba>=0?'#69f0ae':'#ff5252';}
-  if(descEl)descEl.innerText=`Laba ${filterLabel}: 20% dari ${formatRupiah(totalIncome)} dikurangi pengeluaran ${formatRupiah(totalExpense)}`;
+  // Angka utama Ringkasan Laba sekarang menampilkan SISA OPERASIONAL,
+  // supaya tidak rancu dengan limit laba 20%.
+  // Rumus: sisa operasional = 20% pendapatan - pengeluaran operasional.
+  if(labaEl){labaEl.innerText=formatRupiah(sisaOperasional);labaEl.style.color=sisaOperasional>=0?'#69f0ae':'#ff5252';}
+  if(descEl)descEl.innerText=`Sisa operasional ${filterLabel}: limit 20% ${formatRupiah(laba)} - terpakai ${formatRupiah(totalExpense)}`;
   if(pendEl)pendEl.innerText=formatRupiah(totalIncome);
   if(pengeEl)pengeEl.innerText=formatRupiah(totalExpense);
-  if(bersihEl){bersihEl.innerText=formatRupiah(Math.abs(laba));bersihEl.style.color=laba>=0?'#69f0ae':'#ff5252';}
+  if(bersihEl){bersihEl.innerText=formatRupiah(laba);bersihEl.style.color=laba>=0?'#69f0ae':'#ff5252';}
 }
 function showExpenseListTodayModal(){
   const today=getLocalDateString();
