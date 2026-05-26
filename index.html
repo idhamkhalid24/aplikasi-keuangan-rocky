@@ -497,6 +497,24 @@
     .breakdown-label { font-size: 10px; color: var(--muted); font-weight: 700; }
     .breakdown-val { font-size: 12px; font-family: var(--mono); font-weight: 500; cursor: pointer; }
 
+    /* === HUTANG CARD === */
+    .debt-card {
+      background: #fffbeb;
+      border: 1.5px solid #fde68a;
+      border-radius: var(--r-lg);
+      padding: 12px;
+      margin-bottom: 9px;
+      box-shadow: var(--shadow-sm);
+    }
+    .debt-title { font-size: 9px; font-weight: 800; color: #a16207; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+    .debt-amount { font-size: 22px; color: #92400e; cursor: pointer; font-family: var(--mono); font-weight: 500; }
+    .debt-actions { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+    .debt-mini-btn { font-size: 10px; padding: 5px 9px; border-radius: 999px; font-weight: 800; border: 1px solid #fcd34d; background: #fff7ed; color: #92400e; white-space: nowrap; }
+    .debt-mini-btn.pay { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+    .debt-note { font-size: 10px; color: #92400e; font-weight: 700; line-height: 1.35; margin-top: 7px; }
+    .debt-list-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid #fde68a; }
+    .debt-list-item:last-child { border-bottom: 0; }
+
     /* === ZAKAT CARD === */
     .zakat-card {
       background: white; border: 1px solid var(--line);
@@ -650,6 +668,53 @@
     </div>
   </div>
 
+  <!-- Modal Hutang -->
+  <div id="debtModal" class="modal hidden">
+    <div class="box" style="max-width:420px;width:100%">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:14px">
+        <div>
+          <h3>Hutang Uang</h3>
+          <small class="small" style="color:#92400e;font-weight:700;display:block;margin-top:2px">Masuk Saldo Bersih, tapi netral dari pendapatan, pengeluaran, laba, dan zakat.</small>
+        </div>
+        <button class="x" style="font-size:24px" onclick="closeDebtModal()">×</button>
+      </div>
+
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r-lg);padding:12px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div>
+          <div style="font-size:10px;font-weight:800;color:#92400e;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Sisa Hutang Aktif</div>
+          <div id="debtModalActiveTotal" class="num" style="font-size:24px;font-weight:500;color:#92400e">Rp 0</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:var(--ink2);font-weight:700;line-height:2">
+          <div>Pinjam: <span id="debtModalBorrowed" class="num" style="color:#92400e">Rp 0</span></div>
+          <div>Bayar: <span id="debtModalPaid" class="num" style="color:#15803d">Rp 0</span></div>
+        </div>
+      </div>
+
+      <div class="cashout-type-row">
+        <button id="debt-mode-borrow" class="cashout-type-btn active" onclick="setDebtMode('borrow')">Pinjam Uang</button>
+        <button id="debt-mode-pay" class="cashout-type-btn" onclick="setDebtMode('pay')">Bayar Pokok</button>
+      </div>
+      <div class="field"><input type="date" id="debtDate"></div>
+      <div class="field"><input type="text" id="debtParty" placeholder="Nama orang / sumber hutang"></div>
+      <div class="field"><input type="text" id="debtNote" placeholder="Catatan (opsional)"></div>
+      <div class="field amount-wrap">
+        <input type="number" id="debtAmount" placeholder="Nominal" oninput="handleDebtPreview(this)">
+        <span id="debtAmountPreview" class="preview"></span>
+      </div>
+      <div class="row" style="margin-bottom:14px">
+        <button class="btn secondary" onclick="closeDebtModal()">Batal</button>
+        <button id="debtSaveBtn" class="btn" style="background:#a16207" onclick="saveDebtTransaction()">Simpan Hutang</button>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <b style="font-size:13px;font-weight:800">Riwayat Hutang</b>
+        <span id="debtHistoryCount" class="num" style="font-size:12px;color:#92400e;font-weight:500">0 data</span>
+      </div>
+      <div id="debtHistoryList" style="max-height:40vh;overflow-y:auto"></div>
+      <button class="btn secondary" onclick="closeDebtModal()" style="margin-top:14px">Tutup</button>
+    </div>
+  </div>
+
   <!-- Modal Operasional Toko -->
   <div id="opsModal" class="modal hidden">
     <div class="box" style="max-width:400px;width:100%">
@@ -785,6 +850,32 @@
             <b id="cashOutTabunganTotal" class="breakdown-val num" style="color:#854d0e" onclick="openCashOutModal()">Rp 0</b>
           </div>
         </div>
+      </div>
+
+      <!-- Hutang Card -->
+      <div class="debt-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div style="min-width:0">
+            <div class="debt-title">Hutang Uang Aktif</div>
+            <div id="debtActiveTotal" class="debt-amount num" onclick="openDebtModal('list')">Rp 0</div>
+            <div id="debtTodayInfo" class="small" style="margin-top:3px;color:#92400e;font-weight:700">Pinjaman menambah Saldo Bersih, bayar pokok mengurangi Saldo Bersih.</div>
+          </div>
+          <div class="debt-actions">
+            <button class="debt-mini-btn" onclick="openDebtModal('borrow')">+ Pinjam</button>
+            <button class="debt-mini-btn pay" onclick="openDebtModal('pay')">Bayar</button>
+          </div>
+        </div>
+        <div class="cash-fisik-breakdown" style="border-color:#fde68a;margin-top:9px">
+          <div class="breakdown-row">
+            <span class="breakdown-label">Total Pinjaman</span>
+            <b id="debtTodayBorrowed" class="breakdown-val num" style="color:#92400e" onclick="openDebtModal('list')">Rp 0</b>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label">Total Bayar Pokok</span>
+            <b id="debtTodayPaid" class="breakdown-val num" style="color:#15803d" onclick="openDebtModal('list')">Rp 0</b>
+          </div>
+        </div>
+        <div class="debt-note">Tidak masuk pendapatan, pengeluaran, laba, atau zakat. Hanya mutasi Saldo Bersih dan sisa hutang.</div>
       </div>
 
       <!-- Hidden elements tetap ada agar JS tidak error -->
@@ -1638,7 +1729,7 @@ function getFilteredTransactions(){
   return transactions.filter(t=>currentFilter==='month'?t.date.startsWith(now.substring(0,7)):currentFilter==='range'?t.date>=s&&t.date<=e:true)
 }
 function getPeriodLabel(){const now=getLocalDateString();if(currentFilter==='today')return `Hari Ini (${now})`;if(currentFilter==='month')return `Bulan Ini`;if(currentFilter==='range')return `${$('filterStartDate').value} s.d ${$('filterEndDate').value}`;return 'Semua Riwayat'}
-function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else if(!isCashOut(t)){te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN alfajri*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20% final s.d H-1: ${formatRupiah(labaTotal)}\n🕌 Zakat wajib final: ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari alfajri Finance_'}
+function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else if(isBusinessExpense(t)){te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN alfajri*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20% final s.d H-1: ${formatRupiah(labaTotal)}\n🕌 Zakat wajib final: ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari alfajri Finance_'}
 function sendWhatsAppReport(){if(!getFilteredTransactions().length){showToast('Tidak ada transaksi');return}const no=prompt('Nomor WhatsApp tujuan. Kosongkan untuk copy laporan.','');const report=generateWhatsAppReport();if(no&&no.trim()){let n=no.replace(/[^0-9]/g,'');if(n.startsWith('0'))n='62'+n.slice(1);if(!n.startsWith('62'))n='62'+n;window.open(`https://wa.me/${n}?text=${encodeURIComponent(report)}`,'_blank');showToast('Membuka WhatsApp')}else{navigator.clipboard.writeText(report).then(()=>showToast('Laporan disalin')).catch(()=>showToast('Gagal salin'))}}
 
 function isFirebaseUploaded(t){const d=String(t?.description||'');return !!(t&&t.__firebasePreview) || d.startsWith('[FIREBASE:') || d.startsWith('[SERVERPUSAT:')}
@@ -1968,6 +2059,7 @@ function render(){
   updateNetSummary();
   renderTodayFirebaseIncomeHome();
   renderProfitSummary();
+  renderDebtSummary();
 
   // Ringkasan dashboard utama: semua data yang sudah masuk Supabase.
   // Ini yang membuat Saldo Bersih langsung berubah setelah upload omset Server Pusat.
@@ -1976,7 +2068,7 @@ function render(){
   let totalIn=0,totalOut=0,todayOut=0,monthOut=0;
   dashboardRows.forEach(t=>{
     if(t.type==='income')totalIn+=Number(t.amount||0);
-    else if(!isCashOut(t)){
+    else if(isBusinessExpense(t)){
       // cashout (QRIS/Tabungan) hanya kurangi cash fisik, bukan pengeluaran bisnis
       totalOut+=Number(t.amount||0);
       if(t.date===today)todayOut+=Number(t.amount||0);
@@ -1987,8 +2079,10 @@ function render(){
   const fbTodayVal=Number(todayFirebaseIncomeTotal||0);
   const uploadedTodayCheck=getUploadedFirebaseTransaction(today);
   const totalInWithFirebase=totalIn+(fbTodayVal>0&&!uploadedTodayCheck?fbTodayVal:0);
+  const debtSummary=getDebtSummary(dashboardRows);
+  const debtBalance=debtSummary.borrowed-debtSummary.paid;
   const profit=totalInWithFirebase*.2;
-  const net=totalInWithFirebase-totalOut;
+  const net=totalInWithFirebase-totalOut+debtBalance;
   $('totalIncome').innerText=formatRupiah(totalInWithFirebase);
   $('totalExpense').innerText=formatRupiah(todayOut);   // hero: hari ini
   $('autoProfit').innerText=formatRupiah(profit);
@@ -2014,7 +2108,7 @@ function render(){
   } else if(currentFilter==='month'){
     filteredOut=monthOut; filteredLabel='Pengeluaran Bulan Ini';
   } else if(currentFilter==='range'){
-    filteredOut=dashboardRows.filter(t=>t.type==='expense'&&!isCashOut(t)&&t.date>=s2&&t.date<=e2).reduce((a,t)=>a+Number(t.amount||0),0);
+    filteredOut=dashboardRows.filter(t=>isBusinessExpense(t)&&t.date>=s2&&t.date<=e2).reduce((a,t)=>a+Number(t.amount||0),0);
     filteredLabel=s2&&e2?`Pengeluaran ${s2.slice(5)} s.d ${e2.slice(5)}`:'Pengeluaran Custom';
   } else {
     filteredOut=totalOut; filteredLabel='Total Semua Pengeluaran';
@@ -2038,26 +2132,28 @@ function render(){
   const list=$('transactionList');
   if(!list){renderFirebaseUploadCard();return}
   if(!f.length){list.innerHTML='<div class="empty">Belum ada transaksi</div>';renderFirebaseUploadCard();return}
-  const periodExpenseReal=f.filter(t=>t.type==='expense'&&!isCashOut(t)).reduce((sum,t)=>sum+Number(t.amount||0),0);
+  const periodExpenseReal=f.filter(isBusinessExpense).reduce((sum,t)=>sum+Number(t.amount||0),0);
   $('currentPeriodLabel').innerText=`${getPeriodLabel()} · ${formatRupiah(periodIncome-periodExpenseReal)}`;
   list.innerHTML=f.slice(0,80).map(t=>{
     const co=isCashOut(t);
+    const debt=isDebtTx(t);
     const tp=co?getCashOutType(t):'';
     const coLabel={qris:'QRIS',tabungan:'Tabungan',lainnya:'Lainnya'}[tp]||'';
-    const icon=co?'💳':(t.type==='income'?'+':'-');
-    const iconClass=co?'in':(t.type==='income'?'in':'out');
-    const iconStyle=co?'background:#e0f2fe;color:#0369a1':'';
-    const desc=co?cleanCashOutDesc(t.description)||coLabel:cleanFirebaseDesc(t.description);
-    const catLine=t.type==='expense'?getExpenseCategoryChip(t):'';
-    const amtColor=co?'#0369a1':(t.type==='income'?'var(--green)':'var(--red)');
+    const debtLabel=isDebtIn(t)?'Pinjam Uang':(isDebtPay(t)?'Bayar Hutang':'');
+    const icon=co?'💳':(debt?'H':(t.type==='income'?'+':'-'));
+    const iconClass=(co||isDebtIn(t))?'in':'out';
+    const iconStyle=co?'background:#e0f2fe;color:#0369a1':(debt?'background:#fffbeb;color:#92400e':'');
+    const desc=co?cleanCashOutDesc(t.description)||coLabel:(debt?cleanDebtDesc(t.description):cleanFirebaseDesc(t.description));
+    const catLine=t.type==='expense'?getExpenseCategoryChip(t):(debt?`<span class="category-chip" style="background:#fef3c7;color:#92400e">${debtLabel}</span>`:'');
+    const amtColor=co?'#0369a1':(isDebtIn(t)?'#92400e':(isDebtPay(t)?'#15803d':(t.type==='income'?'var(--green)':'var(--red)')));
     const amtPrefix=co?'':'';
-    const amtSign=t.type==='income'?'+':'-';
+    const amtSign=(t.type==='income'||isDebtIn(t))?'+':'-';
     const badge=co?`<span class="cashout-badge ${tp}" style="font-size:9px;margin-left:4px">${coLabel}</span>`:
-      (isFirebaseUploaded(t)?'<span class="lock-badge">SERVER LOCK</span>':'');
+      (debt?`<span class="cashout-badge tabungan" style="font-size:9px;margin-left:4px;background:#fef3c7;color:#92400e">${debtLabel}</span>`:(isFirebaseUploaded(t)?'<span class="lock-badge">SERVER LOCK</span>':''));
     const ctrl=co
       ? `<div class="small" style="color:#0369a1;font-weight:900;font-size:9px">CASH PINDAH</div>`
-      : (isFirebaseUploaded(t)?`<div class="small blue" style="font-weight:900">${t.__firebasePreview?'PREVIEW':'LOCK'}</div>`:`<button class="x" onclick="deleteTransaction(${t.id})">×</button>`);
-    return `<div class="item" style="${co?'background:#f0f9ff;border-color:#bfdbfe':''}"><div class="left"><div class="icon ${iconClass}" style="${iconStyle}">${icon}</div><div class="desc"><b>${escapeHtml(desc)}${badge}</b><small>${t.date}</small>${catLine}</div></div><div class="right"><b class="num" style="color:${amtColor}">${amtSign}${formatRupiah(t.amount).replace('Rp','')}</b>${ctrl}</div></div>`;
+      : (debt?`<div class="small" style="color:#92400e;font-weight:900;font-size:9px">NETRAL</div>`:(isFirebaseUploaded(t)?`<div class="small blue" style="font-weight:900">${t.__firebasePreview?'PREVIEW':'LOCK'}</div>`:`<button class="x" onclick="deleteTransaction(${t.id})">×</button>`));
+    return `<div class="item" style="${co?'background:#f0f9ff;border-color:#bfdbfe':(debt?'background:#fffbeb;border-color:#fde68a':'')}"><div class="left"><div class="icon ${iconClass}" style="${iconStyle}">${icon}</div><div class="desc"><b>${escapeHtml(desc)}${badge}</b><small>${t.date}</small>${catLine}</div></div><div class="right"><b class="num" style="color:${amtColor}">${amtSign}${formatRupiah(t.amount).replace('Rp','')}</b>${ctrl}</div></div>`;
   }).join('')+(f.length>80?`<div class="empty">Ditampilkan 80 dari ${f.length} data biar ringan</div>`:'');
   renderFirebaseUploadCard();
 }
@@ -2136,7 +2232,7 @@ async function importFromText(){try{const raw=$('importDataText').value.trim();i
     importedCategories=Array.isArray(parsed.expenseCategories)?parsed.expenseCategories:[];
   } else throw new Error('format');
   importedTx=importedTx.map(t=>({...t,amount:Number(t.amount||0)}));
-  const ok=importedTx.every(i=>i.id&&i.date&&i.description&&Number.isFinite(Number(i.amount))&&(i.type==='income'||i.type==='expense'));
+  const ok=importedTx.every(i=>i.id&&i.date&&i.description&&Number.isFinite(Number(i.amount))&&(i.type==='income'||i.type==='expense'||i.type===DEBT_IN_TYPE||i.type===DEBT_PAY_TYPE));
   if(!ok)throw new Error('format');
   const catCount=await restoreExpenseCategories(importedCategories);
   await importTransactions(importedTx);
@@ -2146,6 +2242,120 @@ async function importFromText(){try{const raw=$('importDataText').value.trim();i
   showToast('Import berhasil'+(importedZakat.length?` · ${importedZakat.length} zakat`:``)+(catCount?` · ${catCount} kategori`:``))
 }catch(e){console.warn('Import gagal:',e);showToast('Format JSON salah / restore gagal')}}
 function showToast(message,duration=2600){const old=document.querySelector('.toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=message;document.body.appendChild(t);setTimeout(()=>t.remove(),duration)}
+
+// =====================================================
+// HUTANG UANG
+// Pinjaman dan bayar pokok hanya mengubah cash + sisa hutang.
+// Tidak masuk pendapatan, pengeluaran, laba, atau zakat.
+// =====================================================
+const DEBT_IN_TYPE='debt_in';
+const DEBT_PAY_TYPE='debt_pay';
+const DEBT_IN_PREFIX='[HUTANG:PINJAM] ';
+const DEBT_PAY_PREFIX='[HUTANG:BAYAR] ';
+let currentDebtMode='borrow';
+
+function isDebtIn(t){return t&&t.type===DEBT_IN_TYPE}
+function isDebtPay(t){return t&&t.type===DEBT_PAY_TYPE}
+function isDebtTx(t){return isDebtIn(t)||isDebtPay(t)}
+function isBusinessExpense(t){return t&&t.type==='expense'&&!isCashOut(t)}
+function cleanDebtDesc(desc){return String(desc||'').replace(/^\[HUTANG:(?:PINJAM|BAYAR)\]\s*/,'')}
+function buildDebtDesc(prefix,party,note){
+  const name=String(party||'').trim()||'Hutang uang';
+  const extra=String(note||'').trim();
+  return `${prefix}${name}${extra?` - ${extra}`:''}`;
+}
+function getDebtSummary(rows=transactions){
+  const today=getLocalDateString();
+  const debtRows=(rows||[]).filter(isDebtTx);
+  const borrowed=debtRows.filter(isDebtIn).reduce((s,t)=>s+Number(t.amount||0),0);
+  const paid=debtRows.filter(isDebtPay).reduce((s,t)=>s+Number(t.amount||0),0);
+  const todayBorrowed=debtRows.filter(t=>isDebtIn(t)&&t.date===today).reduce((s,t)=>s+Number(t.amount||0),0);
+  const todayPaid=debtRows.filter(t=>isDebtPay(t)&&t.date===today).reduce((s,t)=>s+Number(t.amount||0),0);
+  return {rows:debtRows,borrowed,paid,active:Math.max(0,borrowed-paid),todayBorrowed,todayPaid,todayNet:todayBorrowed-todayPaid};
+}
+function setDebtMode(mode){
+  currentDebtMode=mode==='pay'?'pay':'borrow';
+  const borrow=$('debt-mode-borrow'),pay=$('debt-mode-pay'),btn=$('debtSaveBtn'),party=$('debtParty'),note=$('debtNote');
+  if(borrow)borrow.classList.toggle('active',currentDebtMode==='borrow');
+  if(pay)pay.classList.toggle('active',currentDebtMode==='pay');
+  if(btn){btn.innerText=currentDebtMode==='borrow'?'Simpan Pinjaman':'Simpan Bayar';btn.style.background=currentDebtMode==='borrow'?'#a16207':'#15803d'}
+  if(party)party.placeholder=currentDebtMode==='borrow'?'Nama orang / sumber hutang':'Bayar ke siapa';
+  if(note)note.placeholder=currentDebtMode==='borrow'?'Catatan pinjaman (opsional)':'Catatan pembayaran (opsional)';
+}
+function handleDebtPreview(input){$('debtAmountPreview').innerText=input.value?formatRupiah(getActualAmount(input.value)):''}
+function openDebtModal(mode='borrow'){
+  const date=$('debtDate'),party=$('debtParty'),note=$('debtNote'),amount=$('debtAmount'),preview=$('debtAmountPreview');
+  if(date)date.value=getLocalDateString();
+  if(party)party.value='';
+  if(note)note.value='';
+  if(amount)amount.value='';
+  if(preview)preview.innerText='';
+  setDebtMode(mode==='pay'?'pay':'borrow');
+  renderDebtSummary();
+  $('debtModal').classList.remove('hidden');
+  setTimeout(()=>{const target=mode==='list'?$('debtAmount'):$('debtParty');if(target)target.focus()},80);
+}
+function closeDebtModal(){$('debtModal').classList.add('hidden')}
+function renderDebtHistoryList(){
+  const summary=getDebtSummary();
+  const rows=summary.rows.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||((Number(b.id)||0)-(Number(a.id)||0)));
+  const list=$('debtHistoryList'),count=$('debtHistoryCount');
+  if(count)count.innerText=`${rows.length} data`;
+  if(!list)return;
+  if(!rows.length){list.innerHTML='<div class="empty">Belum ada hutang</div>';return;}
+  list.innerHTML=rows.slice(0,80).map(t=>{
+    const incoming=isDebtIn(t),color=incoming?'#92400e':'#15803d',label=incoming?'Pinjam':'Bayar';
+    const sign=incoming?'+':'-';
+    return `<div class="debt-list-item"><div style="min-width:0;flex:1"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(cleanDebtDesc(t.description)||label)}</b><small style="color:var(--muted)">${t.date} · ${label}</small></div><b class="num" style="font-size:13px;color:${color};white-space:nowrap">${sign}${formatRupiah(t.amount).replace('Rp','')}</b><button class="x" onclick="deleteDebtWithPin(${t.id})">×</button></div>`;
+  }).join('')+(rows.length>80?`<div class="empty">Ditampilkan 80 dari ${rows.length} data</div>`:'');
+}
+function renderDebtSummary(){
+  const s=getDebtSummary();
+  const setText=(id,val)=>{const el=$(id);if(el)el.innerText=formatRupiah(val)};
+  setText('debtActiveTotal',s.active);
+  setText('debtTodayBorrowed',s.borrowed);
+  setText('debtTodayPaid',s.paid);
+  setText('debtModalActiveTotal',s.active);
+  setText('debtModalBorrowed',s.borrowed);
+  setText('debtModalPaid',s.paid);
+  const info=$('debtTodayInfo');
+  if(info)info.innerText=s.active>0?`Belum dibayar: ${formatRupiah(s.active)}`:'Hutang lunas';
+  renderDebtHistoryList();
+}
+async function saveDebtTransaction(){
+  const date=String($('debtDate')?.value||getLocalDateString()).slice(0,10);
+  const party=String($('debtParty')?.value||'').trim();
+  const note=String($('debtNote')?.value||'').trim();
+  const amount=getActualAmount($('debtAmount')?.value||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){showToast('Tanggal hutang tidak valid');return}
+  if(!amount||amount<=0){showToast('Nominal hutang tidak valid');return}
+  const isPay=currentDebtMode==='pay';
+  const summary=getDebtSummary();
+  if(isPay&&summary.active<=0){showToast('Belum ada hutang aktif');return}
+  if(isPay&&amount>summary.active){showToast('Nominal bayar melebihi sisa hutang');return}
+  try{
+    await saveTransaction({id:Date.now(),date,description:buildDebtDesc(isPay?DEBT_PAY_PREFIX:DEBT_IN_PREFIX,party,note),amount,type:isPay?DEBT_PAY_TYPE:DEBT_IN_TYPE});
+    await loadTransactions();
+    render();
+    renderDebtSummary();
+    $('debtParty').value='';$('debtNote').value='';$('debtAmount').value='';$('debtAmountPreview').innerText='';
+    showToast(isPay?'Bayar pokok hutang tersimpan':'Pinjaman uang tersimpan');
+  }catch(e){showToast('Gagal simpan hutang: '+e.message)}
+}
+function deleteDebtWithPin(id){
+  closeDebtModal();
+  setTimeout(()=>{
+    openPasswordModal(async()=>{
+      try{
+        await deleteTransactionFromDB(id);
+        await loadTransactions();
+        render();
+        showToast('Data hutang dihapus');
+      }catch(e){showToast('Gagal hapus hutang: '+e.message)}
+      setTimeout(()=>{openDebtModal('list')},200);
+    });
+  },200);
+}
 
 // =====================================================
 // PENGELUARAN OPERASIONAL TOKO
@@ -2315,7 +2525,7 @@ function renderCashFisik(){
   const fbTotal=Number(todayFirebaseIncomeTotal||0);
   const opsTotal=(transactions||[]).filter(t=>isOpsExpense(t)&&t.date===today).reduce((s,t)=>s+Number(t.amount||0),0);
   const co=getTodayCashOutTotals();
-  // Cash fisik hari ini hanya dari omset Server Pusat/kasir, dikurangi Ops Toko, QRIS, dan Tabungan.
+  // Cash fisik hari ini khusus omset kasir hari ini, tidak termasuk hutang.
   const cashFisik=fbTotal-opsTotal-co.total;
   // Update home card gabungan
   const cfEl=$('cashFisikTotal');
@@ -2329,7 +2539,7 @@ function renderCashFisik(){
     if(co.qris>0)parts.push(`QRIS -${formatRupiah(co.qris)}`);
     if(co.tabungan>0)parts.push(`Tabungan -${formatRupiah(co.tabungan)}`);
     if(manualIncome>0)parts.push(`Manual ${formatRupiah(manualIncome)} tidak masuk cash`);
-    infoEl.innerText=parts.length?parts.join(' · '):'Server Pusat - Ops Toko - QRIS - Tabungan · Manual tidak masuk cash fisik';
+    infoEl.innerText=parts.length?parts.join(' · '):'Server Pusat - Ops Toko - QRIS - Tabungan · Hutang masuk Saldo Bersih';
   }
   // Update ops total di breakdown
   const opsTodayHomeEl=$('opsTodayHomeTotal');if(opsTodayHomeEl)opsTodayHomeEl.innerText=formatRupiah(opsTotal);
@@ -2553,10 +2763,10 @@ function renderFinanceReport(){
   const list=$('reportDetailList');
   if(!rows.length){list.innerHTML='<div class="empty">Belum ada transaksi</div>';return;}
   list.innerHTML=rows.slice(0,120).map(t=>{
-    const co=isCashOut(t);const desc=co?cleanCashOutDesc(t.description):cleanFirebaseDesc(t.description);
-    const label=t.type==='income'?(isFirebaseUploaded(t)||t.__firebasePreview?'Pendapatan Server Pusat':'Pendapatan Manual'):getExpenseCategoryName(t);
-    const sign=t.type==='income'?'+':'-';const color=t.type==='income'?'var(--green)':(co?'#0369a1':'var(--red)');
-    return `<div class="item"><div class="left"><div class="icon ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}</div><div class="desc"><b>${escapeHtml(desc||label)}</b><small>${t.date}</small><span class="category-chip ${t.type==='expense'&&!co?'redchip':''}">${escapeHtml(label)}</span></div></div><div class="right"><b class="num" style="color:${color}">${sign}${formatRupiah(t.amount).replace('Rp','')}</b></div></div>`;
+    const co=isCashOut(t),debt=isDebtTx(t);const desc=co?cleanCashOutDesc(t.description):(debt?cleanDebtDesc(t.description):cleanFirebaseDesc(t.description));
+    const label=t.type==='income'?(isFirebaseUploaded(t)||t.__firebasePreview?'Pendapatan Server Pusat':'Pendapatan Manual'):(debt?(isDebtIn(t)?'Pinjam Uang':'Bayar Pokok Hutang'):getExpenseCategoryName(t));
+    const sign=(t.type==='income'||isDebtIn(t))?'+':'-';const color=t.type==='income'?'var(--green)':(co?'#0369a1':(isDebtIn(t)?'#92400e':(isDebtPay(t)?'#15803d':'var(--red)')));
+    return `<div class="item"><div class="left"><div class="icon ${(t.type==='income'||isDebtIn(t))?'in':'out'}">${debt?'H':(t.type==='income'?'+':'-')}</div><div class="desc"><b>${escapeHtml(desc||label)}</b><small>${t.date}</small><span class="category-chip ${t.type==='expense'&&!co?'redchip':''}">${escapeHtml(label)}</span></div></div><div class="right"><b class="num" style="color:${color}">${sign}${formatRupiah(t.amount).replace('Rp','')}</b></div></div>`;
   }).join('')+(rows.length>120?`<div class="empty">Ditampilkan 120 dari ${rows.length} data</div>`:'');
 }
 function downloadCsvReportFromFinancePage(){
@@ -2620,6 +2830,8 @@ function getCsvReportTransactions(period){
   return rows.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||(Number(a.id)||0)-(Number(b.id)||0));
 }
 function getCsvTransactionCategory(t){
+  if(isDebtIn(t))return 'Pinjam Uang';
+  if(isDebtPay(t))return 'Bayar Pokok Hutang';
   if(t.type==='income')return isFirebaseUploaded(t)?'Pendapatan Server Pusat':'Pendapatan Manual';
   if(isCashOut(t)){
     const type=getCashOutType(t);
@@ -2629,6 +2841,7 @@ function getCsvTransactionCategory(t){
   return 'Pengeluaran Bisnis';
 }
 function getCsvTransactionDescription(t){
+  if(isDebtTx(t))return cleanDebtDesc(t.description)||getCsvTransactionCategory(t);
   if(isCashOut(t))return cleanCashOutDesc(t.description)||getCsvTransactionCategory(t);
   if(isOpsExpense(t))return String(t.description||'').replace(OPS_PREFIX,'');
   return cleanFirebaseDesc(t.description);
@@ -2652,7 +2865,7 @@ function buildDailyCsvRows(rows){
       if(tp==='qris')byDay[d].cashQris+=amount;
       else if(tp==='tabungan')byDay[d].cashTabungan+=amount;
       else byDay[d].cashLainnya+=amount;
-    }else{
+    }else if(t.type==='expense'){
       byDay[d].businessExpense+=amount;
       if(isOpsExpense(t))byDay[d].opsExpense+=amount;
     }
@@ -2685,6 +2898,8 @@ function downloadCsvReport(){
   const cashTabungan=rows.filter(t=>isCashOut(t)&&getCashOutType(t)==='tabungan').reduce((s,t)=>s+Number(t.amount||0),0);
   const cashLainnya=rows.filter(t=>isCashOut(t)&&!['qris','tabungan'].includes(getCashOutType(t))).reduce((s,t)=>s+Number(t.amount||0),0);
   const totalCashOut=cashQris+cashTabungan+cashLainnya;
+  const debtBorrow=rows.filter(isDebtIn).reduce((s,t)=>s+Number(t.amount||0),0);
+  const debtPay=rows.filter(isDebtPay).reduce((s,t)=>s+Number(t.amount||0),0);
   const saldoBersih=totalIncome-businessExpense;
   const cashSetelahPindah=saldoBersih-totalCashOut;
   const laba20=totalIncome*.2;
@@ -2718,6 +2933,12 @@ function downloadCsvReport(){
     ['Total Cash Out',Math.round(totalCashOut)],
     ['Cash Setelah QRIS/Tabungan',Math.round(cashSetelahPindah)],
     [],
+    ['RINGKASAN HUTANG / MUTASI CASH'],
+    ['Keterangan','Nominal (Rp)'],
+    ['Pinjaman Uang',Math.round(debtBorrow)],
+    ['Bayar Pokok Hutang',Math.round(debtPay)],
+    ['Sisa Hutang Aktif Semua Data',Math.round(getDebtSummary().active)],
+    [],
     ['REKAP HARIAN'],
     ['Tanggal','Pendapatan Server Pusat (Rp)','Pendapatan Manual (Rp)','Total Pendapatan (Rp)','Pengeluaran Bisnis (Rp)','Ops Toko (Rp)','Cash Out QRIS (Rp)','Cash Out Tabungan (Rp)','Cash Out Lainnya (Rp)','Total Cash Out (Rp)','Saldo Bersih Usaha (Rp)','Laba 20% (Rp)','Laba Bersih 20% (Rp)'],
     ...buildDailyCsvRows(rows).map(r=>r.map(v=>typeof v==='number'?Math.round(v):v)),
@@ -2728,11 +2949,11 @@ function downloadCsvReport(){
       i+1,
       t.date,
       getCsvTransactionDescription(t),
-      t.type==='income'?'Pemasukan':(isCashOut(t)?'Cash Out / Pindah Cash':'Pengeluaran'),
+      t.type==='income'?'Pemasukan':(isCashOut(t)?'Cash Out / Pindah Cash':(isDebtTx(t)?'Hutang / Mutasi Cash':'Pengeluaran')),
       getCsvTransactionCategory(t),
       Math.round(Number(t.amount||0)),
       getCsvSourceLabel(t),
-      t.__firebasePreview?'LIVE':(isFirebaseUploaded(t)?'LOCK':(isCashOut(t)?'TIDAK DIHITUNG PENGELUARAN':'MANUAL'))
+      t.__firebasePreview?'LIVE':(isFirebaseUploaded(t)?'LOCK':((isCashOut(t)||isDebtTx(t))?'TIDAK DIHITUNG PENGELUARAN':'MANUAL'))
     ]),
     [],
     ['RIWAYAT ZAKAT DALAM PERIODE'],
@@ -2787,6 +3008,8 @@ function getMonthlyReportRows(monthKey){
   return rows.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||(Number(a.id)||0)-(Number(b.id)||0));
 }
 function getMonthlyReportCategory(t){
+  if(isDebtIn(t))return 'Pinjam Uang';
+  if(isDebtPay(t))return 'Bayar Pokok Hutang';
   if(t.type==='income')return isFirebaseUploaded(t)?(t.__firebasePreview?'Pendapatan Server Pusat Live':'Pendapatan SERVER LOCK'):'Pendapatan Manual';
   if(isCashOut(t)){
     const type=getCashOutType(t);
@@ -2798,6 +3021,7 @@ function getMonthlyReportCategory(t){
   return 'Pengeluaran Bisnis';
 }
 function getMonthlyReportDesc(t){
+  if(isDebtTx(t))return cleanDebtDesc(t.description)||getMonthlyReportCategory(t);
   if(isCashOut(t))return cleanCashOutDesc(t.description)||getMonthlyReportCategory(t);
   if(isOpsExpense(t))return String(t.description||'').replace(OPS_PREFIX,'');
   return cleanFirebaseDesc(t.description);
@@ -2846,7 +3070,7 @@ function buildMonthlyDailyRows(rows){
       else byDay[d].cashLainnya+=amount;
     }else if(isOpsExpense(t)){
       byDay[d].ops+=amount;
-    }else{
+    }else if(t.type==='expense'){
       byDay[d].expenseOther+=amount;
     }
   });
@@ -2882,6 +3106,9 @@ function downloadMonthlyFinanceReport(){
   const cashQrisRows=cashOutRows.filter(t=>getCashOutType(t)==='qris');
   const cashTabunganRows=cashOutRows.filter(t=>getCashOutType(t)==='tabungan');
   const cashLainnyaRows=cashOutRows.filter(t=>!['qris','tabungan'].includes(getCashOutType(t)));
+  const debtRows=rows.filter(isDebtTx);
+  const debtBorrowRows=debtRows.filter(isDebtIn);
+  const debtPayRows=debtRows.filter(isDebtPay);
   const zakatRows=getZakatHistory().filter(z=>String(z.date||'').slice(0,7)===targetMonth);
 
   const totalIncome=sumAmount(incomeRows);
@@ -2895,6 +3122,9 @@ function downloadMonthlyFinanceReport(){
   const cashTabungan=sumAmount(cashTabunganRows);
   const cashLainnya=sumAmount(cashLainnyaRows);
   const totalCashOut=cashQris+cashTabungan+cashLainnya;
+  const debtBorrow=sumAmount(debtBorrowRows);
+  const debtPay=sumAmount(debtPayRows);
+  const debtActive=getDebtSummary().active;
   const saldoBersih=totalIncome-totalExpense;
   const cashSetelahPindah=saldoBersih-totalCashOut;
   const laba20=totalIncome*.2;
@@ -2936,11 +3166,18 @@ function downloadMonthlyFinanceReport(){
     ['Total Cash Out',totalCashOut,'QRIS + Tabungan + Lainnya'],
     ['Cash Setelah Pindah QRIS/Tabungan',cashSetelahPindah,'Saldo Bersih - Total Cash Out'],
     [],
+    ['RINGKASAN HUTANG / MUTASI CASH'],
+    ['Keterangan','Nominal (Rp)','Catatan'],
+    ['Pinjaman Uang Bulan Ini',debtBorrow,'Menambah cash, tidak masuk pendapatan'],
+    ['Bayar Pokok Hutang Bulan Ini',debtPay,'Mengurangi cash, tidak masuk pengeluaran'],
+    ['Sisa Hutang Aktif Saat Export',debtActive,'Total pinjam semua data - bayar pokok semua data'],
+    [],
     ['JUMLAH DATA'],
     ['Jenis Data','Jumlah Baris','Total (Rp)'],
     ['Pendapatan',incomeRows.length,totalIncome],
     ['Pengeluaran Bisnis',businessExpenseRows.length,totalExpense],
     ['Cash Out',cashOutRows.length,totalCashOut],
+    ['Hutang / Mutasi Cash',debtRows.length,debtBorrow-debtPay],
     ['Zakat',zakatRows.length,zakatDibayar],
     ['Semua Transaksi',rows.length,'']
   ];
@@ -2962,11 +3199,11 @@ function downloadMonthlyFinanceReport(){
       i+1,
       t.date,
       getMonthlyReportDesc(t),
-      t.type==='income'?'Pemasukan':(isCashOut(t)?'Cash Out / Pindah Cash':'Pengeluaran'),
+      t.type==='income'?'Pemasukan':(isCashOut(t)?'Cash Out / Pindah Cash':(isDebtTx(t)?'Hutang / Mutasi Cash':'Pengeluaran')),
       getMonthlyReportCategory(t),
       getMonthlyReportSource(t),
       Math.round(Number(t.amount||0)),
-      t.__firebasePreview?'LIVE SERVER HARI INI':(isFirebaseUploaded(t)?'SERVER LOCK':(isCashOut(t)?'TIDAK DIHITUNG PENGELUARAN BISNIS':'MANUAL'))
+      t.__firebasePreview?'LIVE SERVER HARI INI':(isFirebaseUploaded(t)?'SERVER LOCK':((isCashOut(t)||isDebtTx(t))?'TIDAK DIHITUNG PENGELUARAN BISNIS':'MANUAL'))
     ]):[['Belum ada data bulan ini','','','','','','','']]),
     [],
     ['','','','','','TOTAL PENDAPATAN',totalIncome,''],
@@ -3023,6 +3260,17 @@ function downloadMonthlyFinanceReport(){
   ];
   const wsCash=makeSheetFromAoa(cashOutData,[6,13,38,24,24,18,34],[5],'A1:G1');
   XLSX.utils.book_append_sheet(wb,wsCash,'Cash Out');
+
+  const debtData=[
+    ['No','Tanggal','Keterangan','Jenis','Nominal (Rp)','Catatan'],
+    ...(debtRows.length?debtRows.map((t,i)=>[i+1,t.date,getMonthlyReportDesc(t),isDebtIn(t)?'Pinjam Uang':'Bayar Pokok Hutang',Math.round(Number(t.amount||0)),'Tidak dihitung pendapatan / pengeluaran / laba / zakat']):[['Belum ada hutang bulan ini','','','','','']]),
+    [],
+    ['','','TOTAL PINJAM','',debtBorrow,''],
+    ['','','TOTAL BAYAR POKOK','',debtPay,''],
+    ['','','SISA HUTANG AKTIF','',debtActive,'']
+  ];
+  const wsDebt=makeSheetFromAoa(debtData,[6,13,40,24,18,44],[4],'A1:F1');
+  XLSX.utils.book_append_sheet(wb,wsDebt,'Hutang');
 
   const zakatData=[
     ['No','Tanggal','Dari Laba (Rp)','Zakat Dibayar (Rp)','Status','Catatan'],
