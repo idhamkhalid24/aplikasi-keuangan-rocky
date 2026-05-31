@@ -1436,21 +1436,22 @@ async function clearAllTransactions(){
 }
 async function clearFullSupabaseData(){
   if(!supabaseClient)throw new Error('Supabase belum aktif');
+  // Reset FULL hanya menghapus ISI data: transaksi, data sync/LOCK, cash out, ops, dan riwayat zakat.
+  // Master kategori pengeluaran sengaja TIDAK dihapus. Kategori hanya bisa dihapus manual dari modal Kategori.
   const txDel=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID);
   if(txDel.error)throw txDel.error;
   const zkDel=await supabaseClient.from('zakat_history').delete().eq('owner_id',OWNER_ID);
   if(zkDel.error)throw zkDel.error;
-  // Update SQL kategori: FULL reset ikut membersihkan kategori custom,
-  // lalu kategori wajib dibuat ulang agar input pengeluaran tetap aman.
-  const catDel=await supabaseClient.from('expense_categories').delete().eq('owner_id',OWNER_ID);
-  if(catDel.error)throw catDel.error;
-  expenseCategories=[];
-  try{await ensureDefaultCategories();await loadExpenseCategories();}catch(e){console.warn('Reset kategori default gagal:',e);}
+  try{
+    await loadExpenseCategories();
+    await ensureDefaultExpenseCategories();
+    await loadExpenseCategories();
+  }catch(e){console.warn('Kategori tetap dipertahankan, tapi gagal dimuat ulang:',e);}
 }
 function resetLocalAfterFullDelete(){
   transactions=[];
   zakatHistory=[];
-  expenseCategories=[];
+  // Kategori tidak direset di sini supaya master kategori tetap tampil setelah Hapus Semua Data Full.
   pendingFirebaseUploads=[];
   firebaseIncomeRows=[];
   firebaseIncomeTotal=0;
@@ -1652,7 +1653,7 @@ async function requestFullReset(){
   openPasswordModal(async()=>{
     const totalTx=(transactions||[]).length;
     const totalCat=(expenseCategories||[]).length;
-    const ok1=confirm('PERINGATAN!\n\nHapus SEMUA data Supabase aplikasi?\n- Semua transaksi manual\n- Semua data Server Pusat sync/LOCK\n- Semua cash out QRIS/Tabungan\n- Semua operasional toko\n- Semua riwayat zakat\n- Semua kategori custom pengeluaran\n\nKategori wajib Lainnya dan Operasional Toko akan dibuat ulang otomatis.\n\nTotal transaksi: '+totalTx+' data.\nTotal kategori: '+totalCat+' kategori.\n\nLanjutkan?');
+    const ok1=confirm('PERINGATAN!\n\nHapus SEMUA ISI data Supabase aplikasi?\n- Semua transaksi manual\n- Semua data Server Pusat sync/LOCK\n- Semua cash out QRIS/Tabungan\n- Semua operasional toko\n- Semua riwayat zakat\n\nKategori pengeluaran TIDAK dihapus. Contoh kategori Internet tetap ada, hanya transaksi seperti beli kuota 15.000 yang terhapus.\nKategori hanya bisa dihapus manual dari menu Kategori.\n\nTotal transaksi yang akan dihapus: '+totalTx+' data.\nTotal kategori yang dipertahankan: '+totalCat+' kategori.\n\nLanjutkan?');
     if(!ok1)return;
     const ok2=confirm('Konfirmasi terakhir: data yang dihapus tidak bisa dikembalikan dari aplikasi. Tetap hapus semua data full?');
     if(!ok2)return;
@@ -1661,11 +1662,11 @@ async function requestFullReset(){
       resetLocalAfterFullDelete();
       await loadTransactions();
       try{await loadZakatHistory();}catch(e){}
-      try{await loadExpenseCategories();await ensureDefaultCategories();await loadExpenseCategories();}catch(e){}
+      try{await loadExpenseCategories();await ensureDefaultExpenseCategories();await loadExpenseCategories();}catch(e){}
       renderCategorySelects();
       render();
       renderFirebaseUploadCard();
-      showToast('Semua data full dihapus. Kategori default dibuat ulang.');
+      showToast('Semua isi data dihapus. Kategori tetap aman.');
     }catch(e){showToast('Gagal hapus full: '+e.message)}
   });
 }
@@ -2212,7 +2213,7 @@ function copyToClipboard(){
   navigator.clipboard.writeText(JSON.stringify(payload)).then(()=>{closeBackupModal();showToast('Data disalin (transaksi + zakat + kategori)')}).catch(()=>showToast('Gagal salin'))
 }
 async function restoreExpenseCategories(importedCategories){
-  if(!Array.isArray(importedCategories)||!importedCategories.length){await ensureDefaultCategories();await loadExpenseCategories();return 0}
+  if(!Array.isArray(importedCategories)||!importedCategories.length){await ensureDefaultExpenseCategories();await loadExpenseCategories();return 0}
   const seenName=new Set(),seenId=new Set();
   const clean=[];
   importedCategories.forEach((c,i)=>{
@@ -2227,14 +2228,16 @@ async function restoreExpenseCategories(importedCategories){
       updated_at:new Date().toISOString()
     });
   });
-  if(!clean.some(c=>c.name.toLowerCase()===DEFAULT_CATEGORY_NAME.toLowerCase()))clean.unshift({id:1700000000001,owner_id:OWNER_ID,name:DEFAULT_CATEGORY_NAME,sort_order:1,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
-  if(!clean.some(c=>c.name.toLowerCase()===OPS_CATEGORY_NAME.toLowerCase()))clean.push({id:1700000000002,owner_id:OWNER_ID,name:OPS_CATEGORY_NAME,sort_order:2,created_at:new Date().toISOString(),updated_at:new Date().toISOString()});
-  const del=await supabaseClient.from('expense_categories').delete().eq('owner_id',OWNER_ID);
-  if(del.error)throw del.error;
-  const ins=await supabaseClient.from('expense_categories').insert(clean);
-  if(ins.error)throw ins.error;
   await loadExpenseCategories();
-  return clean.length;
+  const existingNames=new Set((expenseCategories||[]).map(c=>String(c.name||'').toLowerCase()));
+  const toInsert=clean.filter(c=>!existingNames.has(String(c.name||'').toLowerCase()));
+  if(toInsert.length){
+    const ins=await supabaseClient.from('expense_categories').insert(toInsert);
+    if(ins.error)throw ins.error;
+  }
+  await ensureDefaultExpenseCategories();
+  await loadExpenseCategories();
+  return toInsert.length;
 }
 async function importFromText(){try{const raw=$('importDataText').value.trim();if(!raw){showToast('Data kosong');return}const parsed=JSON.parse(raw);
   // Support format baru {transactions,zakatHistory,expenseCategories} dan format lama array transaksi langsung.
@@ -2252,7 +2255,7 @@ async function importFromText(){try{const raw=$('importDataText').value.trim();i
   const catCount=await restoreExpenseCategories(importedCategories);
   await importTransactions(importedTx);
   if(importedZakat.length){await saveZakatHistory(importedZakat);}
-  await loadTransactions();await loadZakatHistory();await loadExpenseCategories();await migrateLegacyExpensesToDefaultCategory();
+  await loadTransactions();await loadZakatHistory();await loadExpenseCategories();await migrateLegacyExpenseCategories();
   renderCategorySelects();render();closeImportModal();
   showToast('Import berhasil'+(importedZakat.length?` · ${importedZakat.length} zakat`:``)+(catCount?` · ${catCount} kategori`:``))
 }catch(e){console.warn('Import gagal:',e);showToast('Format JSON salah / restore gagal')}}
