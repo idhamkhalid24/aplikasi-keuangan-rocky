@@ -1196,7 +1196,7 @@ let firebaseDb=null,firebaseUnsub=null,todayFirebaseUnsub=null,firebaseUploadDat
 function $(id){return document.getElementById(id)}
 function isSupabaseConfigured(){return SUPABASE_URL&&SUPABASE_ANON_KEY&&!SUPABASE_URL.includes('ISI_')&&!SUPABASE_ANON_KEY.includes('ISI_')}
 function initSupabase(){if(!isSupabaseConfigured()){showToast('Supabase belum disetting');return false}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);return true}
-function goPage(p){currentPage=p;['home','history','laporan','firebase'].forEach(x=>{ const page=$('page'+x[0].toUpperCase()+x.slice(1)); if(page)page.classList.toggle('active',x===p); const nav=$('nav-'+x); if(nav)nav.classList.toggle('active',x===p)}); render(); if(p==='firebase')renderFirebaseUploadCard(); if(p==='laporan')renderFinanceReport()}
+function goPage(p){currentPage=p;['home','history','laporan','firebase'].forEach(x=>{ const page=$('page'+x[0].toUpperCase()+x.slice(1)); if(page)page.classList.toggle('active',x===p); const nav=$('nav-'+x); if(nav)nav.classList.toggle('active',x===p)}); render(); if(p==='firebase')startFirebaseWatch(firebaseUploadDate||getLocalDateString()); if(p==='laporan')renderFinanceReport()}
 function openTransactionModal(){$('inputDate').value=getLocalDateString();renderCategorySelects();updatePlaceholder();$('transactionModal').classList.remove('hidden');setTimeout(()=>$('amount').focus(),80)}
 function closeTransactionModal(){$('transactionModal').classList.add('hidden')}
 
@@ -1495,13 +1495,29 @@ function normalizeFirebaseRows(rows){
 }
 function wibDayStartMs(date){return new Date(`${date}T00:00:00+07:00`).getTime()}
 function wibDayEndMs(date){return new Date(`${date}T23:59:59+07:00`).getTime()}
+const SERVER_PUSAT_RANGE_LIMIT=1500;
 async function fetchFirebaseRowsByRange(start,end){
   if(!serverPusatClient)return [];
-  // Server Pusat memakai model tabel: transactions(id text primary key, data jsonb).
-  // Ambil batch besar lalu filter di browser agar kompatibel dengan field lama/baru.
-  const {data,error}=await serverPusatClient.from('transactions').select('id,data').limit(5000);
-  if(error)throw error;
-  const rows=(data||[]).map(r=>({id:r.id,_docId:r.id,...((r&&r.data&&typeof r.data==='object')?r.data:{})}));
+  const merged={};
+  const addRows=(rows=[])=>rows.forEach(r=>{merged[String(r.id)]={id:r.id,_docId:r.id,...((r&&r.data&&typeof r.data==='object')?r.data:{})}});
+  const rangeQuery=async(field,from,to)=>{
+    const path=`data->>${field}`;
+    const {data,error}=await serverPusatClient.from('transactions').select('id,data').gte(path,String(from)).lte(path,String(to)).limit(SERVER_PUSAT_RANGE_LIMIT);
+    if(error)throw error;
+    addRows(data||[]);
+  };
+  const errors=[];
+  await Promise.allSettled([
+    rangeQuery('dateKey',start,end),
+    rangeQuery('createdAtMs',wibDayStartMs(start),wibDayEndMs(end)),
+    rangeQuery('timestamp',wibDayStartMs(start),wibDayEndMs(end))
+  ]).then(results=>results.forEach(r=>{if(r.status==='rejected')errors.push(r.reason)}));
+  if(!Object.keys(merged).length&&errors.length>=3){
+    const {data,error}=await serverPusatClient.from('transactions').select('id,data').limit(5000);
+    if(error)throw error;
+    addRows(data||[]);
+  }
+  const rows=Object.values(merged);
   return normalizeFirebaseRows(rows).filter(t=>t.dateKey>=start&&t.dateKey<=end);
 }
 function sumFirebaseRows(rows){return (rows||[]).reduce((a,b)=>a+Number(b.amount||0),0)}
@@ -3310,6 +3326,18 @@ function downloadMonthlyFinanceReport(){
   showToast(`Laporan XLS ${monthLabel} didownload`);
 }
 
+let financeRealtimeRefreshTimer=0;
+function scheduleFinanceRealtimeRefresh(){
+  clearTimeout(financeRealtimeRefreshTimer);
+  financeRealtimeRefreshTimer=setTimeout(async()=>{
+    try{
+      await loadTransactions();
+      try{await loadExpenseCategories();}catch(e){}
+      render();
+      renderCashFisik();
+    }catch(e){console.warn('Refresh finance realtime gagal:',e)}
+  },650);
+}
 
 async function initApp(){try{if(!initSupabase())return;
   // Tampilkan loading saat fetch Supabase
@@ -3324,12 +3352,16 @@ async function initApp(){try{if(!initSupabase())return;
   try{await loadExpenseCategories();await ensureDefaultExpenseCategories();await migrateLegacyExpenseCategories();}catch(e){console.warn('Kategori belum siap:',e)}
   await loadZakatHistory();
   if(firebaseDb){
-    startFirebaseWatch(firebaseUploadDate||getLocalDateString());
-    // Tunggu snapshot pertama Server Pusat (dengan timeout fallback)
+    // Tunggu snapshot pertama Server Pusat hari ini. Panel tanggal lain baru dibaca saat halaman Server dibuka.
     await Promise.race([
       startTodayFirebaseWatch(),
       new Promise(r=>setTimeout(r,SERVER_TIMEOUT))
     ]);
+    if(currentPage==='firebase')startFirebaseWatch(firebaseUploadDate||getLocalDateString());
+    else{
+      firebaseIncomeRows=[...(todayFirebaseIncomeRows||[])];
+      firebaseIncomeTotal=Number(todayFirebaseIncomeTotal||0);
+    }
   }
   // Semua data siap — render sekali, langsung akurat
   if(nb)nb.style.opacity='1';
@@ -3340,7 +3372,7 @@ async function initApp(){try{if(!initSupabase())return;
   try{
     supabaseClient.channel('rh-tx-realtime')
       .on('postgres_changes',{event:'*',schema:'public',table:'transactions',filter:`owner_id=eq.${OWNER_ID}`},async()=>{
-        await loadTransactions();try{await loadExpenseCategories();}catch(e){}render();renderCashFisik();
+        scheduleFinanceRealtimeRefresh();
       }).subscribe();
   }catch(e){console.warn('Realtime tidak aktif:',e);}
   showToast('Supabase tersambung')}catch(e){console.error(e);showToast('Gagal konek: '+e.message,6000)}}initApp();
